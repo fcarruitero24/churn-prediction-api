@@ -1,344 +1,275 @@
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+"""Customer Churn Prediction API.
 
+Serves the logistic regression trained in
+https://github.com/fcarruitero24/Customer-Churn-Prediction-End-to-End-ML-Pipeline
+
+The model arrives here as `model_spec.json`: the scaler statistics, the category
+order, 21 coefficients and an intercept. Scoring is a dot product and a sigmoid,
+written in plain Python — so this service ships without scikit-learn, NumPy or
+pandas. That keeps the deployment at a few kilobytes and the cold start close to
+instant, which is what matters on serverless.
+
+The exporter that produces the spec verifies it against scikit-learn on 400 real
+customers and refuses to emit anything that disagrees by more than 1e-9.
+
+Run locally:
+    uvicorn main:app --reload
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
+
+SPEC_PATH = Path(__file__).parent / "model_spec.json"
+SPEC = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+
+THRESHOLDS = SPEC["risk_thresholds"]
+BATCH_LIMIT = 1000
 
 app = FastAPI(
-    title="Vercel + FastAPI",
-    description="Vercel + FastAPI",
+    title="Customer Churn Prediction API",
+    description=(
+        "Scores telecom customers for churn risk. Returns a probability, a "
+        "binary prediction at the 0.5 threshold, and the risk band a retention "
+        "team acts on."
+    ),
     version="1.0.0",
 )
 
 
-@app.get("/api/data")
-def get_sample_data():
-    return {
-        "data": [
-            {"id": 1, "name": "Sample Item 1", "value": 100},
-            {"id": 2, "name": "Sample Item 2", "value": 200},
-            {"id": 3, "name": "Sample Item 3", "value": 300}
-        ],
-        "total": 3,
-        "timestamp": "2024-01-01T00:00:00Z"
-    }
+# --------------------------------------------------------------------- model --
+def score(customer: dict) -> float:
+    """Churn probability for one customer, from the spec alone.
 
-
-@app.get("/api/items/{item_id}")
-def get_item(item_id: int):
-    return {
-        "item": {
-            "id": item_id,
-            "name": "Sample Item " + str(item_id),
-            "value": item_id * 100
-        },
-        "timestamp": "2024-01-01T00:00:00Z"
-    }
-
-
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Vercel + FastAPI</title>
-        <link rel="icon" type="image/x-icon" href="/favicon.ico">
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-                background-color: #000000;
-                color: #ffffff;
-                line-height: 1.6;
-                min-height: 100vh;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            header {
-                border-bottom: 1px solid #333333;
-                padding: 0;
-            }
-            
-            nav {
-                max-width: 1200px;
-                margin: 0 auto;
-                display: flex;
-                align-items: center;
-                padding: 1rem 2rem;
-                gap: 2rem;
-            }
-            
-            .logo {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: #ffffff;
-                text-decoration: none;
-            }
-            
-            .nav-links {
-                display: flex;
-                gap: 1.5rem;
-                margin-left: auto;
-            }
-            
-            .nav-links a {
-                text-decoration: none;
-                color: #888888;
-                padding: 0.5rem 1rem;
-                border-radius: 6px;
-                transition: all 0.2s ease;
-                font-size: 0.875rem;
-                font-weight: 500;
-            }
-            
-            .nav-links a:hover {
-                color: #ffffff;
-                background-color: #111111;
-            }
-            
-            main {
-                flex: 1;
-                max-width: 1200px;
-                margin: 0 auto;
-                padding: 4rem 2rem;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-            }
-            
-            .hero {
-                margin-bottom: 3rem;
-            }
-            
-            .hero-code {
-                margin-top: 2rem;
-                width: 100%;
-                max-width: 900px;
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            }
-            
-            .hero-code pre {
-                background-color: #0a0a0a;
-                border: 1px solid #333333;
-                border-radius: 8px;
-                padding: 1.5rem;
-                text-align: left;
-                grid-column: 1 / -1;
-            }
-            
-            h1 {
-                font-size: 3rem;
-                font-weight: 700;
-                margin-bottom: 1rem;
-                background: linear-gradient(to right, #ffffff, #888888);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            }
-            
-            .subtitle {
-                font-size: 1.25rem;
-                color: #888888;
-                margin-bottom: 2rem;
-                max-width: 600px;
-            }
-            
-            .cards {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 1.5rem;
-                width: 100%;
-                max-width: 900px;
-            }
-            
-            .card {
-                background-color: #111111;
-                border: 1px solid #333333;
-                border-radius: 8px;
-                padding: 1.5rem;
-                transition: all 0.2s ease;
-                text-align: left;
-            }
-            
-            .card:hover {
-                border-color: #555555;
-                transform: translateY(-2px);
-            }
-            
-            .card h3 {
-                font-size: 1.125rem;
-                font-weight: 600;
-                margin-bottom: 0.5rem;
-                color: #ffffff;
-            }
-            
-            .card p {
-                color: #888888;
-                font-size: 0.875rem;
-                margin-bottom: 1rem;
-            }
-            
-            .card a {
-                display: inline-flex;
-                align-items: center;
-                color: #ffffff;
-                text-decoration: none;
-                font-size: 0.875rem;
-                font-weight: 500;
-                padding: 0.5rem 1rem;
-                background-color: #222222;
-                border-radius: 6px;
-                border: 1px solid #333333;
-                transition: all 0.2s ease;
-            }
-            
-            .card a:hover {
-                background-color: #333333;
-                border-color: #555555;
-            }
-            
-            .status-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 0.5rem;
-                background-color: #0070f3;
-                color: #ffffff;
-                padding: 0.25rem 0.75rem;
-                border-radius: 20px;
-                font-size: 0.75rem;
-                font-weight: 500;
-                margin-bottom: 2rem;
-            }
-            
-            .status-dot {
-                width: 6px;
-                height: 6px;
-                background-color: #00ff88;
-                border-radius: 50%;
-            }
-            
-            pre {
-                background-color: #0a0a0a;
-                border: 1px solid #333333;
-                border-radius: 6px;
-                padding: 1rem;
-                overflow-x: auto;
-                margin: 0;
-            }
-            
-            code {
-                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-                font-size: 0.85rem;
-                line-height: 1.5;
-                color: #ffffff;
-            }
-            
-            /* Syntax highlighting */
-            .keyword {
-                color: #ff79c6;
-            }
-            
-            .string {
-                color: #f1fa8c;
-            }
-            
-            .function {
-                color: #50fa7b;
-            }
-            
-            .class {
-                color: #8be9fd;
-            }
-            
-            .module {
-                color: #8be9fd;
-            }
-            
-            .variable {
-                color: #f8f8f2;
-            }
-            
-            .decorator {
-                color: #ffb86c;
-            }
-            
-            @media (max-width: 768px) {
-                nav {
-                    padding: 1rem;
-                    flex-direction: column;
-                    gap: 1rem;
-                }
-                
-                .nav-links {
-                    margin-left: 0;
-                }
-                
-                main {
-                    padding: 2rem 1rem;
-                }
-                
-                h1 {
-                    font-size: 2rem;
-                }
-                
-                .hero-code {
-                    grid-template-columns: 1fr;
-                }
-                
-                .cards {
-                    grid-template-columns: 1fr;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <header>
-            <nav>
-                <a href="/" class="logo">Vercel + FastAPI</a>
-                <div class="nav-links">
-                    <a href="/docs">API Docs</a>
-                    <a href="/api/data">API</a>
-                </div>
-            </nav>
-        </header>
-        <main>
-            <div class="hero">
-                <h1>Vercel + FastAPI</h1>
-                <div class="hero-code">
-                    <pre><code><span class="keyword">from</span> <span class="module">fastapi</span> <span class="keyword">import</span> <span class="class">FastAPI</span>
-
-<span class="variable">app</span> = <span class="class">FastAPI</span>()
-
-<span class="decorator">@app.get</span>(<span class="string">"/"</span>)
-<span class="keyword">def</span> <span class="function">read_root</span>():
-    <span class="keyword">return</span> {<span class="string">"Python"</span>: <span class="string">"on Vercel"</span>}</code></pre>
-                </div>
-            </div>
-            
-            <div class="cards">
-                <div class="card">
-                    <h3>Interactive API Docs</h3>
-                    <p>Explore this API's endpoints with the interactive Swagger UI. Test requests and view response schemas in real-time.</p>
-                    <a href="/docs">Open Swagger UI →</a>
-                </div>
-                
-                <div class="card">
-                    <h3>Sample Data</h3>
-                    <p>Access sample JSON data through our REST API. Perfect for testing and development purposes.</p>
-                    <a href="/api/data">Get Data →</a>
-                </div>
-                
-            </div>
-        </main>
-    </body>
-    </html>
+    Mirrors `src/export.py:score_one` in the training repository line for line.
     """
+    z = SPEC["intercept"]
+    k = 0
+    for field in SPEC["numeric"]:
+        z += SPEC["coef"][k] * (customer[field["name"]] - field["mean"]) / field["scale"]
+        k += 1
+    for block in SPEC["categorical"]:
+        for category in block["categories"]:
+            if customer[block["name"]] == category:
+                z += SPEC["coef"][k]
+            k += 1
+    return 1.0 / (1.0 + math.exp(-z))
+
+
+def risk_band(probability: float) -> str:
+    """Map a probability to the band a retention team acts on.
+
+    The cut points are asymmetric on purpose: catching a likely churner early is
+    worth more than avoiding a false alarm, so "Medium" starts below 0.5.
+    """
+    if probability >= THRESHOLDS["high"]:
+        return "High"
+    if probability >= THRESHOLDS["medium"]:
+        return "Medium"
+    return "Low"
+
+
+def predict(customer: dict) -> dict:
+    probability = score(customer)
+    return {
+        "churn_probability": round(probability, 4),
+        "churn_prediction": int(probability >= 0.5),
+        "risk_band": risk_band(probability),
+    }
+
+
+# ------------------------------------------------------------------ schemas --
+class Customer(BaseModel):
+    """One customer profile. Constraints mirror the training data."""
+
+    tenure_months: int = Field(..., ge=0, le=120, description="Months as a customer")
+    monthly_charges: float = Field(..., ge=0, le=500, description="Current monthly bill")
+    total_charges: float = Field(..., ge=0, description="Lifetime billed amount")
+    num_support_tickets: int = Field(..., ge=0, le=50)
+    age: int = Field(..., ge=18, le=120)
+
+    contract_type: Literal["Month-to-month", "One year", "Two year"]
+    internet_service: Literal["DSL", "Fiber optic", "No"]
+    payment_method: Literal["Electronic check", "Mailed check", "Bank transfer", "Credit card"]
+    gender: Literal["Female", "Male"]
+    has_streaming: Literal["No", "Yes"]
+    paperless_billing: Literal["No", "Yes"]
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "tenure_months": 2, "monthly_charges": 95.0, "total_charges": 190.0,
+                "num_support_tickets": 4, "age": 30,
+                "contract_type": "Month-to-month", "internet_service": "Fiber optic",
+                "payment_method": "Electronic check", "gender": "Female",
+                "has_streaming": "No", "paperless_billing": "Yes",
+            }
+        }
+    }
+
+
+class Prediction(BaseModel):
+    churn_probability: float = Field(..., description="Probability in [0, 1]")
+    churn_prediction: int = Field(..., description="1 when probability >= 0.5")
+    risk_band: Literal["Low", "Medium", "High"]
+
+
+# ---------------------------------------------------------------- endpoints --
+@app.get("/health")
+def health() -> dict:
+    """Readiness check."""
+    return {"status": "ok", "model": SPEC["model"], "features": len(SPEC["coef"])}
+
+
+@app.get("/model")
+def model_info() -> dict:
+    """What the service is serving, and the fields it expects."""
+    return {
+        "model": SPEC["model"],
+        "coefficients": len(SPEC["coef"]),
+        "risk_thresholds": THRESHOLDS,
+        "numeric_features": [f["name"] for f in SPEC["numeric"]],
+        "categorical_features": {
+            block["name"]: block["categories"] for block in SPEC["categorical"]
+        },
+        "source": (
+            "https://github.com/fcarruitero24/"
+            "Customer-Churn-Prediction-End-to-End-ML-Pipeline"
+        ),
+    }
+
+
+@app.post("/predict", response_model=Prediction)
+def predict_one(customer: Customer) -> dict:
+    """Score a single customer."""
+    return predict(customer.model_dump())
+
+
+@app.post("/predict/batch", response_model=list[Prediction])
+def predict_many(customers: list[Customer]) -> list[dict]:
+    """Score up to 1 000 customers in one call."""
+    if not customers:
+        raise HTTPException(status_code=422, detail="The customer list is empty.")
+    if len(customers) > BATCH_LIMIT:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Batch limit is {BATCH_LIMIT} customers; received {len(customers)}.",
+        )
+    return [predict(c.model_dump()) for c in customers]
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def landing() -> str:
+    return f"""
+<title>Customer Churn Prediction API</title>
+<style>
+  :root {{
+    color-scheme: light;
+    --bg: #f2f3f1; --card: #fdfdfc; --ink: #16181c; --dim: #5f6a68;
+    --rule: #dcded9; --accent: #eb6834; --ok: #17a06f;
+  }}
+  @media (prefers-color-scheme: dark) {{
+    :root {{
+      color-scheme: dark;
+      --bg: #10131a; --card: #191d26; --ink: #eef0ee; --dim: #99a0a8;
+      --rule: #2b313c; --accent: #d95926; --ok: #199e70;
+    }}
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; background: var(--bg); color: var(--ink); line-height: 1.6;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }}
+  .wrap {{ max-width: 780px; margin: 0 auto; padding: 56px 22px 80px; }}
+  h1 {{
+    font-family: Georgia, serif; font-size: clamp(28px, 5vw, 40px);
+    margin: 0 0 10px; letter-spacing: -.02em; line-height: 1.1;
+  }}
+  h2 {{ font-family: Georgia, serif; font-size: 21px; margin: 30px 0 10px; }}
+  .lede {{ color: var(--dim); font-size: 17px; margin: 0 0 26px; max-width: 58ch; }}
+  .pill {{
+    display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px;
+    font-family: ui-monospace, Consolas, monospace; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--ok); border: 1px solid currentColor;
+    padding: 4px 10px; border-radius: 2px; margin-bottom: 20px;
+  }}
+  .pill::before {{
+    content: ""; width: 7px; height: 7px; background: currentColor; border-radius: 50%;
+  }}
+  table {{ border-collapse: collapse; width: 100%; margin: 0 0 8px; font-size: 14.5px; }}
+  th, td {{ text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); }}
+  th {{
+    font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--dim); font-family: ui-monospace, Consolas, monospace;
+  }}
+  code {{
+    font-family: ui-monospace, Consolas, monospace; font-size: .92em;
+    background: var(--card); padding: 2px 6px; border: 1px solid var(--rule);
+    border-radius: 2px;
+  }}
+  pre {{
+    background: var(--card); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 15px 17px; overflow-x: auto; font-size: 12.5px;
+    font-family: ui-monospace, Consolas, monospace; line-height: 1.55;
+  }}
+  a {{ color: var(--accent); }}
+  .cta {{
+    display: inline-block; background: var(--accent); color: #fff;
+    text-decoration: none; font-weight: 600; padding: 11px 20px;
+    border-radius: 3px; margin: 2px 0 6px;
+  }}
+  footer {{
+    margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--rule);
+    color: var(--dim); font-size: 13.5px;
+  }}
+</style>
+
+<div class="wrap">
+  <span class="pill">Service online</span>
+  <h1>Customer Churn Prediction API</h1>
+  <p class="lede">
+    Predicts which telecom customers are about to cancel. Send a customer
+    profile and get back a churn probability and the risk band a retention team
+    acts on.
+  </p>
+
+  <a class="cta" href="/docs">Try the API in your browser →</a>
+
+  <h2>Endpoints</h2>
+  <table>
+    <tr><th>Route</th><th>What it does</th></tr>
+    <tr><td><code>GET /health</code></td><td>Readiness check</td></tr>
+    <tr><td><code>GET /model</code></td><td>Which model is served and the fields it expects</td></tr>
+    <tr><td><code>POST /predict</code></td><td>Score one customer</td></tr>
+    <tr><td><code>POST /predict/batch</code></td><td>Score up to 1 000 customers</td></tr>
+    <tr><td><code>GET /docs</code></td><td>Interactive documentation (Swagger)</td></tr>
+  </table>
+
+  <h2>Example</h2>
+  <pre>curl -X POST /predict -H "Content-Type: application/json" -d '{{
+  "tenure_months": 2, "monthly_charges": 95.0, "total_charges": 190.0,
+  "num_support_tickets": 4, "age": 30,
+  "contract_type": "Month-to-month", "internet_service": "Fiber optic",
+  "payment_method": "Electronic check", "gender": "Female",
+  "has_streaming": "No", "paperless_billing": "Yes"
+}}'
+
+{{"churn_probability": 0.9583, "churn_prediction": 1, "risk_band": "High"}}</pre>
+
+  <footer>
+    Serving a <strong>{SPEC["model"]}</strong> with {len(SPEC["coef"])}
+    coefficients, without scikit-learn or NumPy on board: the model is exported
+    to JSON and evaluated with a weighted sum and a sigmoid.<br>
+    Training and evaluation live in
+    <a href="https://github.com/fcarruitero24/Customer-Churn-Prediction-End-to-End-ML-Pipeline">the
+    project repository</a>.
+  </footer>
+</div>
+"""

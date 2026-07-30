@@ -1,0 +1,11 @@
+# Runtime — deliberately tiny. The model is a JSON file scored with plain
+# Python, so there is no scikit-learn, NumPy or pandas here.
+fastapi>=0.110
+pydantic>=2.0
+
+# Local development only (Vercel provides its own server)
+uvicorn[standard]>=0.27
+
+# Tests
+pytest>=7.4
+httpx>=0.27          # required by fastapi.testclient

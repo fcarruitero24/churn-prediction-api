@@ -1,28 +1,166 @@
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fexamples%2Ftree%2Fmain%2Fpython%2Ffastapi&demo-title=FastAPI&demo-description=Use%20FastAPI%20on%20Vercel%20with%20Serverless%20Functions%20using%20the%20Python%20Runtime.&demo-url=https%3A%2F%2Fvercel-plus-fastapi.vercel.app%2F&demo-image=https://assets.vercel.com/image/upload/v1669994600/random/python.png)
+<div align="center">
 
-# FastAPI + Vercel
+# Customer Churn Prediction API
 
-This example shows how to use FastAPI on Vercel with Serverless Functions using the [Python Runtime](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/python).
+**A trained churn model, served over HTTP — with no ML runtime on board.**
 
-## Demo
+![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![tests](https://img.shields.io/badge/tests-24%20passing-17a06f)
+![deps](https://img.shields.io/badge/runtime%20deps-2-eb6834)
 
-https://vercel-plus-fastapi.vercel.app/
+</div>
 
-## How it Works
+---
 
-This example uses the Asynchronous Server Gateway Interface (ASGI) with FastAPI to enable handling requests on Vercel with Serverless Functions.
+## What this is
 
-## Running Locally
+The companion service to
+[**Customer-Churn-Prediction-End-to-End-ML-Pipeline**](https://github.com/fcarruitero24/Customer-Churn-Prediction-End-to-End-ML-Pipeline),
+where the model is trained and evaluated. This repository does one job: take a
+customer profile over HTTP and return a churn probability.
 
 ```bash
-npm i -g vercel
-vercel dev
+curl -X POST https://your-deployment.vercel.app/predict \
+  -H "Content-Type: application/json" \
+  -d '{"tenure_months": 2, "monthly_charges": 95.0, "total_charges": 190.0,
+       "num_support_tickets": 4, "age": 30,
+       "contract_type": "Month-to-month", "internet_service": "Fiber optic",
+       "payment_method": "Electronic check", "gender": "Female",
+       "has_streaming": "No", "paperless_billing": "Yes"}'
 ```
 
-Your FastAPI application is now available at `http://localhost:3000`.
+```json
+{ "churn_probability": 0.9583, "churn_prediction": 1, "risk_band": "High" }
+```
 
-## One-Click Deploy
+---
 
-Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=vercel-examples):
+## The interesting part: no scikit-learn
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fexamples%2Ftree%2Fmain%2Fpython%2Ffastapi&demo-title=FastAPI&demo-description=Use%20FastAPI%20on%20Vercel%20with%20Serverless%20Functions%20using%20the%20Python%20Runtime.&demo-url=https%3A%2F%2Fvercel-plus-fastapi.vercel.app%2F&demo-image=https://assets.vercel.com/image/upload/v1669994600/random/python.png)
+Serving a model usually means shipping its training stack. For this model that
+would be scikit-learn, NumPy, SciPy and pandas — roughly **150 MB**, against
+Vercel's 250 MB limit per function, with a cold start of several seconds.
+
+The winning model is a **logistic regression**, and a logistic regression is not
+really a program: it is a scaler, 21 coefficients and an intercept. So the
+training repository exports exactly that to
+[`model_spec.json`](model_spec.json) — **2.7 KB** — and this service scores with
+a weighted sum and a sigmoid, in plain Python.
+
+| | With the ML stack | This service |
+|---|:--:|:--:|
+| Runtime dependencies | scikit-learn, NumPy, SciPy, pandas | `fastapi`, `pydantic` |
+| Bundle | ~150 MB | **~2.7 KB of model** |
+| Cold start | seconds | near-instant |
+
+**This is only safe because it is verified, not assumed.** The exporter in the
+training repository re-scores 400 real customers using nothing but the spec and
+compares against scikit-learn, refusing to emit anything that disagrees by more
+than `1e-9`. The current export agrees to **3.3e-16** — machine epsilon.
+
+On top of that, [`test_api.py`](test_api.py) pins the answer for a known
+customer to the value scikit-learn produces. If the spec is ever replaced with a
+mismatched export, the tests fail instead of the service quietly returning wrong
+probabilities.
+
+---
+
+## Endpoints
+
+| Route | Purpose |
+|---|---|
+| `GET /` | Landing page |
+| `GET /docs` | Interactive Swagger UI — try requests from the browser |
+| `GET /health` | Readiness check |
+| `GET /model` | Which model is served and the fields it expects |
+| `POST /predict` | Score one customer |
+| `POST /predict/batch` | Score up to 1 000 customers |
+
+### Input fields
+
+| Field | Type | Range / values |
+|---|---|---|
+| `tenure_months` | int | 0 – 120 |
+| `monthly_charges` | float | 0 – 500 |
+| `total_charges` | float | ≥ 0 |
+| `num_support_tickets` | int | 0 – 50 |
+| `age` | int | 18 – 120 |
+| `contract_type` | str | Month-to-month · One year · Two year |
+| `internet_service` | str | DSL · Fiber optic · No |
+| `payment_method` | str | Electronic check · Mailed check · Bank transfer · Credit card |
+| `gender` | str | Female · Male |
+| `has_streaming` | str | Yes · No |
+| `paperless_billing` | str | Yes · No |
+
+Anything outside these is rejected with a `422` by Pydantic before it reaches
+the model.
+
+### Risk bands
+
+The response includes the band a retention team acts on. The cut points are
+asymmetric on purpose — catching a likely churner early is worth more than
+avoiding a false alarm:
+
+| Band | Probability | Observed churn in that band |
+|---|:--:|:--:|
+| Low | < 0.35 | 13.3 % |
+| Medium | 0.35 – 0.60 | 44.7 % |
+| **High** | ≥ 0.60 | **68.2 %** |
+
+Those rates are measured on the held-out test set in the training repository, so
+the bands are not just labels — churn really does rise across them.
+
+---
+
+## Run it locally
+
+```bash
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+Open http://localhost:8000/docs and send a request from the browser.
+
+```bash
+pytest -q      # 24 tests
+```
+
+---
+
+## Deploying
+
+The service is a single `main.py` with an ASGI `app`, which Vercel's Python
+runtime detects automatically — no configuration file needed.
+
+A step-by-step walkthrough (in Spanish) is in
+**[GUIA-DESPLIEGUE.md](GUIA-DESPLIEGUE.md)**.
+
+---
+
+## Updating the model
+
+The spec is generated by the training repository, never edited by hand:
+
+```bash
+# in Customer-Churn-Prediction-End-to-End-ML-Pipeline
+python -m src.train        # retrain
+python -m src.export       # verify against scikit-learn, write model_spec.json
+```
+
+Copy the resulting `model_spec.json` here and run `pytest`. If the model changed
+materially, the pinned test will tell you.
+
+> [!NOTE]
+> The exporter only supports linear models. If a retrain ever picks Gradient
+> Boosting or Random Forest instead, it stops with a clear error rather than
+> emitting a spec it cannot represent — at that point this service would need
+> the trees serialised, or the ML stack after all.
+
+---
+
+## License
+
+MIT
+
+<sub>Built by <a href="https://github.com/fcarruitero24">Fabrizio Carruitero</a>.</sub>

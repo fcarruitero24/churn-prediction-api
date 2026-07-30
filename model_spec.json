@@ -1,0 +1,129 @@
+{
+  "model": "LogisticRegression",
+  "numeric": [
+    {
+      "name": "tenure_months",
+      "mean": 21.77357142857143,
+      "scale": 14.890702327839561
+    },
+    {
+      "name": "monthly_charges",
+      "mean": 61.2659375,
+      "scale": 21.709750346816374
+    },
+    {
+      "name": "total_charges",
+      "mean": 1309.2836428571427,
+      "scale": 1058.1466731197393
+    },
+    {
+      "name": "num_support_tickets",
+      "mean": 0.8726785714285714,
+      "scale": 0.973049314327
+    },
+    {
+      "name": "age",
+      "mean": 46.79071428571429,
+      "scale": 14.772843794459826
+    }
+  ],
+  "categorical": [
+    {
+      "name": "contract_type",
+      "categories": [
+        "Month-to-month",
+        "One year",
+        "Two year"
+      ]
+    },
+    {
+      "name": "internet_service",
+      "categories": [
+        "DSL",
+        "Fiber optic",
+        "No"
+      ]
+    },
+    {
+      "name": "payment_method",
+      "categories": [
+        "Electronic check",
+        "Mailed check",
+        "Bank transfer",
+        "Credit card"
+      ]
+    },
+    {
+      "name": "gender",
+      "categories": [
+        "Female",
+        "Male"
+      ]
+    },
+    {
+      "name": "has_streaming",
+      "categories": [
+        "No",
+        "Yes"
+      ]
+    },
+    {
+      "name": "paperless_billing",
+      "categories": [
+        "No",
+        "Yes"
+      ]
+    }
+  ],
+  "coef": [
+    -0.692593250904539,
+    0.6987795514907785,
+    0.23868013892588608,
+    0.26831821406487427,
+    -0.14048055628275646,
+    1.3802700382891953,
+    -0.29227321909737614,
+    -1.6848336863914999,
+    -0.15952528302943664,
+    0.033527572105383076,
+    -0.47083915627563383,
+    0.45385750930085694,
+    -0.31709772193293223,
+    -0.3658957004654045,
+    -0.36770095410221054,
+    -0.29275362358357243,
+    -0.3040832436161155,
+    -0.25979041867335595,
+    -0.33704644852633164,
+    -0.29155317797037195,
+    -0.30528368922930676
+  ],
+  "intercept": -0.6502424065645643,
+  "feature_order": [
+    "tenure_months",
+    "monthly_charges",
+    "total_charges",
+    "num_support_tickets",
+    "age",
+    "contract_type=Month-to-month",
+    "contract_type=One year",
+    "contract_type=Two year",
+    "internet_service=DSL",
+    "internet_service=Fiber optic",
+    "internet_service=No",
+    "payment_method=Electronic check",
+    "payment_method=Mailed check",
+    "payment_method=Bank transfer",
+    "payment_method=Credit card",
+    "gender=Female",
+    "gender=Male",
+    "has_streaming=No",
+    "has_streaming=Yes",
+    "paperless_billing=No",
+    "paperless_billing=Yes"
+  ],
+  "risk_thresholds": {
+    "medium": 0.35,
+    "high": 0.6
+  }
+}

@@ -130,19 +130,35 @@ No necesitas tarjeta de crédito.
 
 ### 2.4 Espera
 
-Tarda entre uno y dos minutos. Al terminar verás una pantalla de felicitación
-con tu dirección, algo como:
+Tarda entre uno y dos minutos. Al terminar verás tu dirección.
 
+**Este proyecto ya está desplegado en:**
+
+### https://churn-prediction-api-ruddy.vercel.app
+
+### 2.5 Quita la protección
+
+Vercel activa una capa de autenticación en los proyectos nuevos. Sin quitarla,
+la API responde `401 Protected deployment` a cualquiera que no tenga tu sesión
+iniciada — un reclutador vería una pantalla de login en lugar de tu API.
+
+Desde el panel: **Settings** → **Deployment Protection** → **Vercel
+Authentication** → **Disabled** → **Save**.
+
+O desde la terminal:
+
+```powershell
+vercel project protection disable --sso
 ```
-https://fastapi-python-boilerplate-abc123.vercel.app
-```
 
-**Esa URL ya es pública.** Cualquiera en el mundo puede usarla.
+> Piénsalo antes: al desactivarla, cualquiera puede llamar a tu API sin límite
+> de peticiones. Para un proyecto de portafolio es lo que quieres, pero conviene
+> saberlo. Se vuelve a activar con `enable` en lugar de `disable`.
 
-### 2.5 Compruébalo
+### 2.6 Compruébalo
 
-Abre `https://TU-URL.vercel.app/docs` y repite la prueba del paso 1.6. Si
-devuelve `0.9583`, está funcionando igual que en tu máquina.
+Abre https://churn-prediction-api-ruddy.vercel.app/docs y repite la prueba del
+paso 1.6. Si devuelve `0.9583`, está funcionando igual que en tu máquina.
 
 ---
 
@@ -151,7 +167,7 @@ devuelve `0.9583`, está funcionando igual que en tu máquina.
 ### Desde la terminal
 
 ```powershell
-curl -X POST https://TU-URL.vercel.app/predict `
+curl -X POST https://churn-prediction-api-ruddy.vercel.app/predict `
   -H "Content-Type: application/json" `
   -d '{\"tenure_months\":2,\"monthly_charges\":95.0,\"total_charges\":190.0,\"num_support_tickets\":4,\"age\":30,\"contract_type\":\"Month-to-month\",\"internet_service\":\"Fiber optic\",\"payment_method\":\"Electronic check\",\"gender\":\"Female\",\"has_streaming\":\"No\",\"paperless_billing\":\"Yes\"}'
 ```
@@ -172,7 +188,7 @@ cliente = {
     "has_streaming": "No", "paperless_billing": "Yes",
 }
 
-r = requests.post("https://TU-URL.vercel.app/predict", json=cliente)
+r = requests.post("https://churn-prediction-api-ruddy.vercel.app/predict", json=cliente)
 print(r.json())
 # {'churn_probability': 0.9583, 'churn_prediction': 1, 'risk_band': 'High'}
 ```

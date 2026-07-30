@@ -1,0 +1,21 @@
+# Nada de esto hace falta en el servidor: Vercel instala las dependencias
+# desde requirements.txt en su propio entorno.
+.venv
+venv
+env
+__pycache__
+.pytest_cache
+
+# Tests y documentación: se ejecutan y se leen en GitHub, no en producción.
+test_api.py
+GUIA-DESPLIEGUE.md
+
+# Control de versiones y editores
+.git
+.github
+.vscode
+.idea
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

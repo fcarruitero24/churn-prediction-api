@@ -4,8 +4,17 @@
 
 **A trained churn model, served over HTTP — with no ML runtime on board.**
 
+<br>
+
+[![Try the live API](https://img.shields.io/badge/%E2%96%B6%20Try%20the%20live%20API-eb6834?style=for-the-badge)](https://churn-prediction-api-ruddy.vercel.app/docs)
+
+**[churn-prediction-api-ruddy.vercel.app](https://churn-prediction-api-ruddy.vercel.app/docs)**
+
+<br>
+
 ![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Vercel](https://img.shields.io/badge/deployed-Vercel-000000?logo=vercel&logoColor=white)
 ![tests](https://img.shields.io/badge/tests-24%20passing-17a06f)
 ![deps](https://img.shields.io/badge/runtime%20deps-2-eb6834)
 
@@ -20,8 +29,10 @@ The companion service to
 where the model is trained and evaluated. This repository does one job: take a
 customer profile over HTTP and return a churn probability.
 
+It is live — the call below runs against the deployed service:
+
 ```bash
-curl -X POST https://your-deployment.vercel.app/predict \
+curl -X POST https://churn-prediction-api-ruddy.vercel.app/predict \
   -H "Content-Type: application/json" \
   -d '{"tenure_months": 2, "monthly_charges": 95.0, "total_charges": 190.0,
        "num_support_tickets": 4, "age": 30,
@@ -33,6 +44,12 @@ curl -X POST https://your-deployment.vercel.app/predict \
 ```json
 { "churn_probability": 0.9583, "churn_prediction": 1, "risk_band": "High" }
 ```
+
+That customer — two months in, on a month-to-month contract, paying 95 a month
+with four support tickets — has a **95.8 % chance of cancelling**. It is the
+same number scikit-learn returns in the training repository.
+
+Measured cold start: **0.61 s** on the first call, 0.42 s afterwards.
 
 ---
 

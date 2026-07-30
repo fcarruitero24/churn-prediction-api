@@ -253,7 +253,8 @@ def landing() -> str:
   </table>
 
   <h2>Example</h2>
-  <pre>curl -X POST /predict -H "Content-Type: application/json" -d '{{
+  <pre>curl -X POST https://churn-prediction-api-ruddy.vercel.app/predict \\
+  -H "Content-Type: application/json" -d '{{
   "tenure_months": 2, "monthly_charges": 95.0, "total_charges": 190.0,
   "num_support_tickets": 4, "age": 30,
   "contract_type": "Month-to-month", "internet_service": "Fiber optic",

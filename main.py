@@ -168,7 +168,31 @@ def predict_many(customers: list[Customer]) -> list[dict]:
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def landing() -> str:
     return f"""
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Customer Churn Prediction API</title>
+<meta name="description" content="Regresión logística exportada a un JSON de 2.7 KB: predicción de churn sin scikit-learn ni runtime de ML en producción. FastAPI sobre Vercel.">
+<link rel="canonical" href="https://churn-prediction-api-ruddy.vercel.app/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Fabrizio Carruitero">
+<meta property="og:locale" content="es_PE">
+<meta property="og:title" content="Customer Churn Prediction API">
+<meta property="og:description" content="Regresión logística exportada a un JSON de 2.7 KB: predicción de churn sin scikit-learn ni runtime de ML en producción. FastAPI sobre Vercel.">
+<meta property="og:image" content="https://churn-prediction-api-ruddy.vercel.app/preview.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Customer Churn Prediction API de Fabrizio Carruitero, construida con FastAPI">
+<meta property="og:url" content="https://churn-prediction-api-ruddy.vercel.app/">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Customer Churn Prediction API">
+<meta name="twitter:description" content="Regresión logística exportada a un JSON de 2.7 KB: predicción de churn sin scikit-learn ni runtime de ML en producción. FastAPI sobre Vercel.">
+<meta name="twitter:image" content="https://churn-prediction-api-ruddy.vercel.app/preview.png">
 <style>
   :root {{
     color-scheme: light;

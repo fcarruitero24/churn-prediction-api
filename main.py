@@ -170,6 +170,7 @@ def landing() -> str:
     return f"""
 <!doctype html>
 <html lang="es">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -255,6 +256,9 @@ def landing() -> str:
   }}
 </style>
 
+</head>
+<body>
+
 <div class="wrap">
   <span class="pill">Service online</span>
   <h1>Customer Churn Prediction API</h1>
@@ -297,4 +301,6 @@ def landing() -> str:
     project repository</a>.
   </footer>
 </div>
+</body>
+</html>
 """

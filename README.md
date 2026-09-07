@@ -6,9 +6,9 @@
 
 <br>
 
-[![Try the live API](https://img.shields.io/badge/%E2%96%B6%20Try%20the%20live%20API-eb6834?style=for-the-badge)](https://churn-prediction-api-ruddy.vercel.app/docs)
+[![Try the live API](https://img.shields.io/badge/%E2%96%B6%20Try%20the%20live%20API-eb6834?style=for-the-badge)](https://churn-prediction-api-ruddy.vercel.app/)
 
-**[churn-prediction-api-ruddy.vercel.app](https://churn-prediction-api-ruddy.vercel.app/docs)**
+**[churn-prediction-api-ruddy.vercel.app](https://churn-prediction-api-ruddy.vercel.app/)**
 
 <br>
 
